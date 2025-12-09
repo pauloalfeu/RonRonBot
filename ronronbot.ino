@@ -1,6 +1,10 @@
 /*
   Ana Caroline Pedrosa & Paulo Alfeu
+<<<<<<< HEAD
   Monitoramento de Água para Gato - Versão em Português
+=======
+  Monitoramento de Agua para Gato
+>>>>>>> 5c8ea07cc4b8a3ddb72b22cbef7d7844e8df0e27
 */
 
 // Bibliotecas
