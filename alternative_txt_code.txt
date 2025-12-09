@@ -11,7 +11,6 @@
 #include <DallasTemperature.h>
 #include <SPI.h>
 #include <MFRC522.h>
-#include <time.h>
 
 //Conexao com o bot
 #define WIFI_SSID      "boanoite"
@@ -23,11 +22,6 @@ WiFiClientSecure secured_client;
 UniversalTelegramBot bot(BOT_TOKEN, secured_client);
 const unsigned long INTERVALO_VERIFICACAO_MS = 1000;
 unsigned long ultima_verificacao_bot;
-
-// Configuracao de tempo
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = -10800;
-const int daylightOffset_sec = 0;
 
 // Pinagem dos sensores
 #define PINO_DS18B20    4    // Sensor de temperatura
@@ -60,7 +54,6 @@ float temperatura_atual = 0.0;
 unsigned long tempo_ultima_leitura = 0;
 unsigned long tempo_ultimo_alerta = 0;
 int visitas_hoje = 0;
-int visitas_ontem = 0;
 
 // Variaveis para controlar o detected do gato
 bool gato_confirmado = false; 
@@ -73,16 +66,6 @@ float historico_temperatura[TAMANHO_JANELA_FILTRO] = {0.0};
 int indice_filtro_temp = 0;
 float temperatura_filtrada = 0.0;
 
-// Historico de alertas
-struct Alerta {
-    String mensagem;
-    String timestamp;
-    bool ativo;
-};
-const int MAX_ALERTAS = 10;
-Alerta historico_alertas[MAX_ALERTAS];
-int indice_alerta_atual = 0;
-int total_alertas = 0;
 
 // Estados do bebedouro para gatos
 enum EstadoBebedouro{
@@ -95,52 +78,6 @@ enum EstadoBebedouro{
 };
 
 EstadoBebedouro estado_atual = ESTADO_INICIAL;
-
-// Funcoes de tempo
-String getTime() {
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo)) {
-        return "Erro ao obter hora";
-    }
-    char buffer[30];
-    strftime(buffer, sizeof(buffer), "%d/%m/%Y %H:%M:%S", &timeinfo);
-    return String(buffer);
-}
-
-String getTimeShort() {
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo)) {
-        return "??:??";
-    }
-    char buffer[10];
-    strftime(buffer, sizeof(buffer), "%H:%M", &timeinfo);
-    return String(buffer);
-}
-
-int getDiaAtual() {
-    struct tm timeinfo;
-    if (!getLocalTime(&timeinfo)) {
-        return -1;
-    }
-    return timeinfo.tm_mday;
-}
-
-void verificar_reset_diario() {
-    static int dia_anterior = -1;
-    int dia_atual = getDiaAtual();
-    
-    if (dia_anterior == -1) {
-        dia_anterior = dia_atual;
-        return;
-    }
-    
-    if (dia_atual != dia_anterior) {
-        visitas_ontem = visitas_hoje;
-        visitas_hoje = 0;
-        dia_anterior = dia_atual;
-        Serial.println("Reset diario realizado.");
-    }
-}
 
 // Funcoes auxiliares para o beberouro
 float calcular_temperatura_filtrada(float nova_leitura) {
@@ -185,25 +122,6 @@ String obter_status_nivel(int contagem) {
       }
 
     return "Vazio (0%)"; 
-}
-
-int obter_percentual_nivel(int contagem) {
-    if (contagem == 3) return 100;
-    if (contagem == 2) return 66;
-    if (contagem == 1) return 33;
-    return 0;
-}
-
-// Funcoes para alertas
-void adicionar_alerta(String tipo, String detalhe) {
-    historico_alertas[indice_alerta_atual].mensagem = tipo + ": " + detalhe;
-    historico_alertas[indice_alerta_atual].timestamp = getTime();
-    historico_alertas[indice_alerta_atual].ativo = true;
-    
-    indice_alerta_atual = (indice_alerta_atual + 1) % MAX_ALERTAS;
-    if (total_alertas < MAX_ALERTAS) {
-        total_alertas++;
-    }
 }
 
 // Funcoes RFID
@@ -277,10 +195,6 @@ void init_wifi() {
   Serial.print("\nWiFi connected. IP address: ");
   Serial.println(WiFi.localIP());
   Serial.println();
-  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
-  delay(2000);
-  Serial.print("Hora atual: ");
-  Serial.println(getTime());
 }
 
 
@@ -292,11 +206,7 @@ void estado_inicial() {
     init_rfid();
     init_ds18b20();
     init_wifi();
-    
-    String msg = "*Sistema de Monitoramento RonRonWater*\n\n";
-    msg += "Sistema conectado em: " + getTime() + "\n\n";
-    msg += "Use /help para ver os comandos disponiveis.";
-    bot.sendMessage(ID_CHAT, msg, "Markdown");
+    bot.sendMessage(ID_CHAT, "Sistema de Monitoramento de RonRonWater Conectado!", "");
     
     digitalWrite(PINO_LED_STATUS, LOW);
     tempo_ultima_leitura = millis(); //passa um tempo ate para o proximo estado inciar
@@ -305,8 +215,6 @@ void estado_inicial() {
 
 void estado_ocioso() {
     digitalWrite(PINO_LED_STATUS, LOW);
-    
-    verificar_reset_diario();
 
     //fica verificando se ha sinal da tag do gato
     if (verificar_tag_rfid()) {
@@ -365,13 +273,12 @@ void estado_envio_dados() {
     digitalWrite(PINO_LED_STATUS, LOW);
 
     int contagem_molhados = ler_nivel_agua(); 
-    int percentual = obter_percentual_nivel(contagem_molhados);
+    String status_nivel = obter_status_nivel(contagem_molhados);
 
     String mensagem = "*Relatorio Periodico:*\n";
-    mensagem += "Nivel da agua: " + String(percentual) + "%\n";
+    mensagem += "Nivel da agua: " + status_nivel + "\n";
     mensagem += "Temperatura: " + String(temperatura_filtrada, 1) + " C\n";
-    mensagem += "Visitas hoje: " + String(visitas_hoje) + "\n";
-    mensagem += "Horario: " + getTimeShort();
+    mensagem += "Visitas hoje: " + String(visitas_hoje);
     
     bot.sendMessage(ID_CHAT, mensagem, "Markdown");
     
@@ -389,16 +296,11 @@ void estado_alerta() {
         float temp_filtrada = temperatura_filtrada;
 
         if (contagem_molhados <= 1) { 
-            int percentual = obter_percentual_nivel(contagem_molhados);
-            mensagem_alerta += "\nNivel da agua baixo: " + String(percentual) + "%. Adicione mais agua";
-            adicionar_alerta("Agua Baixa", String(percentual) + "%");
+            mensagem_alerta += "\nNivel da agua baixo: " + obter_status_nivel(contagem_molhados) + ". Adicione mais agua";
         }
         if (temp_filtrada > VALOR_MAX_TEMPERATURA) {
             mensagem_alerta += "\nTemperatura da agua elevada: " + String(temp_filtrada, 1) + " C.";
-            adicionar_alerta("Temperatura Alta", String(temp_filtrada, 1) + " C");
         }
-        
-        mensagem_alerta += "\n" + getTimeShort();
         
         bot.sendMessage(ID_CHAT, mensagem_alerta, "Markdown");
         tempo_ultimo_alerta = millis(); 
@@ -465,118 +367,57 @@ void tratar_novas_mensagens(int numNovasMensagens)
 
         String resposta = "";
         int contagem_nivel = ler_nivel_agua();
-        int percentual = obter_percentual_nivel(contagem_nivel);
         String status_nivel = obter_status_nivel(contagem_nivel);
 
         if (texto == "/status") {
             ler_sensor_temperatura(); 
             
             resposta = "*Status do Bebedouro*\n\n";
-            resposta += "```\n";
-            resposta += "Nivel da agua: " + String(percentual) + "%\n";
+            resposta += "Nivel da agua: " + status_nivel + "\n";
             resposta += "Temperatura: " + String(temperatura_filtrada, 1) + " C\n";
-            resposta += "Visitas hoje: " + String(visitas_hoje) + "\n";
-            resposta += "```\n";
-            resposta += "Atualizado: " + getTimeShort();
+            resposta += "Visitas hoje: " + String(visitas_hoje);
             
             bot.sendMessage(id_chat, resposta, "Markdown");
             
         } 
         else if (texto == "/nivel") {
-            resposta = "*Nivel da Agua*\n\n";
-            resposta += "Atual: " + String(percentual) + "% (" + status_nivel + ")\n\n";
-            
-            String barra = "";
-            int blocos = percentual / 10;
-            for (int j = 0; j < 10; j++) {
-                barra += (j < blocos) ? "=" : "-";
-            }
-            resposta += "[" + barra + "]\n\n";
-            
-            if (percentual <= 33) {
-                resposta += "Nivel baixo! Adicione agua.";
-            } else if (percentual <= 66) {
-                resposta += "Nivel adequado.";
-            } else {
-                resposta += "Nivel otimo!";
-            }
-            
-            bot.sendMessage(id_chat, resposta, "Markdown");
+            resposta = "Nivel atual da agua: " + status_nivel;
+            bot.sendMessage(id_chat, resposta, "");
 
         } 
         
         else if (texto == "/temperatura") {
             ler_sensor_temperatura(); 
             
-            resposta = "*Temperatura da Agua*\n\n";
-            resposta += "Atual: " + String(temperatura_filtrada, 1) + " C\n";
-            resposta += "Limite max: " + String(VALOR_MAX_TEMPERATURA, 1) + " C\n\n";
+            resposta = "Temperatura atual: " + String(temperatura_filtrada, 1) + " C";
             
-            if (temperatura_filtrada > VALOR_MAX_TEMPERATURA) {
-                resposta += "Temperatura acima do limite!";
-            } else if (temperatura_filtrada > VALOR_MAX_TEMPERATURA - 2) {
-                resposta += "Temperatura proxima do limite.";
-            } else {
-                resposta += "Temperatura ideal.";
-            }
-            
-            bot.sendMessage(id_chat, resposta, "Markdown");
+            bot.sendMessage(id_chat, resposta, "");
 
         } 
       
         else if (texto == "/visitas") {
-            resposta = "*Historico de Visitas*\n\n";
-            resposta += "Hoje: " + String(visitas_hoje) + " visitas\n";
-            resposta += "Ontem: " + String(visitas_ontem) + " visitas\n\n";
+            resposta = "Visitas hoje: " + String(visitas_hoje);
             
-            if (visitas_hoje == 0) {
-                resposta += "Seu gato ainda nao bebeu agua hoje.";
-            } else if (visitas_hoje < 3) {
-                resposta += "Poucas visitas hoje.";
-            } else if (visitas_hoje < 6) {
-                resposta += "Hidratacao normal!";
-            } else {
-                resposta += "Muito ativo hoje!";
-            }
-            
-            bot.sendMessage(id_chat, resposta, "Markdown");
+            bot.sendMessage(id_chat, resposta, "");
         } 
        
         else if (texto == "/alertas") {
-            resposta = "*Historico de Alertas*\n\n";
+            resposta = "Configuracao de alertas:\n";
+            resposta += "Temperatura maxima: " + String(VALOR_MAX_TEMPERATURA, 1) + " C\n";
+            resposta += "Alerta quando nivel <= 33%";
             
-            if (total_alertas == 0) {
-                resposta += "Nenhum alerta registrado!\n\n";
-                resposta += "Seu bebedouro esta funcionando perfeitamente.";
-            } else {
-                resposta += "Ultimos alertas:\n\n";
-                
-                int contador = 0;
-                for (int j = total_alertas - 1; j >= 0 && contador < 5; j--) {
-                    int idx = (indice_alerta_atual - 1 - contador + MAX_ALERTAS) % MAX_ALERTAS;
-                    if (historico_alertas[idx].ativo) {
-                        resposta += "- " + historico_alertas[idx].mensagem + "\n";
-                        resposta += "  " + historico_alertas[idx].timestamp + "\n\n";
-                        contador++;
-                    }
-                }
-                
-                resposta += "Total de alertas: " + String(total_alertas);
-            }
-            
-            bot.sendMessage(id_chat, resposta, "Markdown");
+            bot.sendMessage(id_chat, resposta, "");
         }
-        
         // Comando /start ou desconhecido
         else if (texto == "/start" || texto == "/help") {
             resposta = "Ola, " + nome_usuario + "! Eu sou o Monitor de Bebedouro.\n\n";
             resposta += "Comandos disponiveis:\n";
-            resposta += "*/status* - Visao geral completa\n";
-            resposta += "*/nivel* - Nivel da agua\n";
-            resposta += "*/temperatura* - Temperatura\n";
-            resposta += "*/visitas* - Historico de idas\n";
-            resposta += "*/alertas* - Historico de alertas";
-            bot.sendMessage(id_chat, resposta, "Markdown");
+            resposta += "/status - Visao geral completa\n";
+            resposta += "/nivel - Nivel da agua\n";
+            resposta += "/temperatura - Temperatura\n";
+            resposta += "/visitas - Historico de idas\n";
+            resposta += "/alertas - Limites de seguranca";
+            bot.sendMessage(id_chat, resposta, "");
         }
     }
 }

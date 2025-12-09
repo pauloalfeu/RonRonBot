@@ -1,43 +1,48 @@
-# 🐱 RonRonBot - Monitor de Bebedouro para Gatos
+# RonRonBot - Monitor de Bebedouro para Gatos
 
 Sistema de monitoramento inteligente de bebedouro para pets utilizando ESP32 com integração ao Telegram.
 
-## 📋 Índice
-
-- [Sobre o Projeto](#sobre-o-projeto)
-- [Hardware Necessário](#hardware-necessário)
-- [Bibliotecas](#bibliotecas)
-- [Configuração Inicial](#configuração-inicial)
-- [Estrutura do Código](#estrutura-do-código)
-- [Funções Principais](#funções-principais)
-- [Comandos do Telegram](#comandos-do-telegram)
-- [Máquina de Estados](#máquina-de-estados)
+**Autores:** Ana Caroline Pedrosa & Paulo Alfeu
 
 ---
 
-## 🎯 Sobre o Projeto
+## Organizacao do Projeto
 
-O RonRonBot é um sistema automatizado que monitora o bebedouro do seu gato em tempo real, enviando notificações via Telegram sobre:
-
-- **Nível de água** - Detecta quando está baixo
-- **Temperatura** - Alerta quando está muito quente
-- **Visitas do gato** - Conta quantas vezes seu pet bebeu água
-- **Relatórios periódicos** - Envia atualizações a cada hora
+- Sobre o Projeto
+- Hardware Necessario
+- Bibliotecas
+- Configuracao Inicial
+- Estrutura do Codigo
+- Funcoes Principais
+- Comandos do Telegram
+- Maquina de Estados
+- Troubleshooting
 
 ---
 
-## 🔧 Hardware Necessário
+## Sobre o Projeto
 
-### Componentes Principais
+O RonRonBot monitora automaticamente o bebedouro do seu gato, enviando notificacoes via Telegram sobre:
 
-| Componente | Quantidade | Função |
+- **Nivel de agua** - Detecta quando esta baixo atraves de 3 sensores capacitivos
+- **Temperatura** - Monitora e alerta quando a agua esta muito quente
+- **Visitas do gato** - Detecta presenca atraves de tag RFID (requer configuracao)
+- **Relatorios periodicos** - Envia atualizacoes automaticas a cada hora
+
+---
+
+## Hardware Necessario
+
+### Componentes
+
+| Componente | Quantidade | Funcao |
 |------------|------------|--------|
 | ESP32 | 1 | Microcontrolador principal |
-| Sensor DS18B20 | 1 | Medição de temperatura da água |
-| Sensores Capacitivos | 3 | Detecção de nível de água |
-| Módulo RFID MFRC522 | 1 | Identificação do gato via tag |
-| Tag RFID | 1 | Coleira do gato |
-| LED | 1 | Indicação visual de status |
+| Sensor DS18B20 | 1 | Medicao de temperatura da agua |
+| Sensores Capacitivos | 3 | Detecao de nivel de agua (alto, medio, baixo) |
+| Modulo RFID MFRC522 | 1 | Identificacao do gato (opcional) |
+| Tag RFID | 1 | Para coleira do gato (opcional) |
+| LED | 1 | Indicacao visual de status |
 
 ### Pinagem
 
@@ -45,37 +50,38 @@ O RonRonBot é um sistema automatizado que monitora o bebedouro do seu gato em t
 ESP32          Componente
 GPIO 4    -->  Sensor DS18B20 (temperatura)
 GPIO 13   -->  LED de status
-GPIO 5    -->  RFID RST
-GPIO 15   -->  RFID SS (CS)
+GPIO 5    -->  RFID RST (opcional)
+GPIO 15   -->  RFID SS/CS (opcional)
 GPIO 6    -->  Sensor capacitivo 1 (superior)
-GPIO 7    -->  Sensor capacitivo 2 (médio)
+GPIO 7    -->  Sensor capacitivo 2 (medio)
 GPIO 8    -->  Sensor capacitivo 3 (inferior)
 ```
 
+**Nota sobre RFID:** O codigo inclui suporte para RFID mas requer configuracao do UID da tag. O sistema funciona normalmente sem RFID, apenas nao contara visitas automaticamente.
+
 ---
 
-## 📚 Bibliotecas
+## Bibliotecas
 
 Instale as seguintes bibliotecas na Arduino IDE:
 
 ```cpp
-#include <WiFi.h>                    // Conexão WiFi
-#include <WiFiClientSecure.h>        // Comunicação segura
+#include <WiFi.h>                    // Conexao WiFi
+#include <WiFiClientSecure.h>        // Comunicacao segura HTTPS
 #include <UniversalTelegramBot.h>    // API do Telegram
 #include <OneWire.h>                 // Protocolo OneWire
 #include <DallasTemperature.h>       // Sensor DS18B20
-#include <SPI.h>                     // Comunicação SPI
-#include <MFRC522.h>                 // Leitor RFID
-#include <time.h>                    // Funções de tempo
+#include <SPI.h>                     // Comunicacao SPI (para RFID)
+#include <MFRC522.h>                 // Leitor RFID (opcional)
 ```
 
 ---
 
-## ⚙️ Configuração Inicial
+## Configuracao Inicial
 
 ### 1. Configurar WiFi
 
-Edite as credenciais da sua rede:
+Edite no codigo:
 
 ```cpp
 #define WIFI_SSID      "SuaRedeWiFi"
@@ -84,103 +90,66 @@ Edite as credenciais da sua rede:
 
 ### 2. Configurar Bot do Telegram
 
-#### Criando o Bot:
+**Criando o Bot:**
 
 1. Abra o Telegram e procure por `@BotFather`
-2. Envie o comando `/newbot`
-3. Escolha um nome e username para seu bot
+2. Envie `/newbot`
+3. Escolha um nome e username
 4. Copie o **token** fornecido
 
-#### No código:
+**No codigo:**
 
 ```cpp
 #define BOT_TOKEN      "SEU_TOKEN_AQUI"
 const long ID_CHAT = SEU_ID_AQUI;
 ```
 
-**Como descobrir seu ID do chat:**
-- Envie uma mensagem para `@userinfobot`
-- Ele retornará seu ID
+**Como descobrir seu ID:**
+- Envie mensagem para `@userinfobot`
+- Ele retornara seu ID numerico
 
-### 3. Descobrir UID da Tag RFID
+### 3. Configurar Tag RFID (Opcional)
 
-Execute o código e aproxime a tag do leitor. No Serial Monitor aparecerá:
+Se desejar usar a deteccao automatica de visitas:
 
-```
-UID: DE AD BE EF
-```
-
-Insira no código:
+1. Execute o codigo
+2. Aproxime a tag do leitor
+3. Veja o UID no Serial Monitor
+4. Configure no codigo:
 
 ```cpp
-const byte UID_GATO[] = {0xDE, 0xAD, 0xBE, 0xEF};
+const byte UID_GATO[] = {0xDE, 0xAD, 0xBE, 0xEF}; // Seu UID aqui
 ```
 
 ---
 
-## 🏗️ Estrutura do Código
+## Estrutura do Codigo
 
-### Variáveis Globais Principais
+### Variaveis Globais Principais
 
 ```cpp
 float temperatura_atual           // Temperatura lida pelo sensor
-int visitas_hoje                  // Contador de visitas do dia
-int visitas_ontem                 // Visitas do dia anterior
-float temperatura_filtrada        // Média das últimas 5 leituras
+float temperatura_filtrada        // Media movel das ultimas 5 leituras
+int visitas_hoje                  // Contador de visitas do gato
 ```
 
-### Constantes Configuráveis
+### Constantes Configuraveis
 
 ```cpp
-VALOR_MAX_TEMPERATURA = 24.0      // Temperatura máxima permitida (°C)
-INTERVALO_RELATORIO_MS = 3600000  // Intervalo entre relatórios (1 hora)
-COOLDOWN_ALERTA_MS = 900000       // Tempo mínimo entre alertas (15 min)
-TEMPO_MINIMO_PERMANENCIA_MS = 5000 // Tempo para confirmar visita (5 seg)
+VALOR_MAX_TEMPERATURA = 24.0           // Temperatura maxima (C)
+INTERVALO_RELATORIO_MS = 3600000       // Relatorio a cada 1 hora
+COOLDOWN_ALERTA_MS = 900000            // Espera 15 min entre alertas
+TEMPO_MINIMO_PERMANENCIA_MS = 5000     // 5 seg para confirmar visita
 ```
 
 ---
 
-## 🔧 Funções Principais
+## Funcoes Principais
 
-### 📡 Funções de Tempo
-
-#### `String getTime()`
-Retorna a data e hora completa formatada.
-
-```cpp
-// Exemplo de retorno: "09/12/2025 14:32:15"
-String timestamp = getTime();
-```
-
-#### `String getTimeShort()`
-Retorna apenas a hora no formato HH:MM.
-
-```cpp
-// Exemplo de retorno: "14:32"
-String hora = getTimeShort();
-```
-
-#### `int getDiaAtual()`
-Retorna o dia atual do mês (1-31).
-
-```cpp
-int dia = getDiaAtual(); // Retorna 9 se for dia 09
-```
-
-#### `void verificar_reset_diario()`
-Verifica se mudou o dia e reseta os contadores.
-
-**Como funciona:**
-- Compara o dia atual com o dia anterior
-- Se mudou: salva visitas de hoje em "ontem" e zera "hoje"
-- Executada automaticamente no estado OCIOSO
-
----
-
-### 🌡️ Funções de Sensores
+### Funcoes de Leitura de Sensores
 
 #### `float ler_sensor_temperatura()`
-Faz a leitura do sensor DS18B20.
+Le a temperatura do sensor DS18B20.
 
 ```cpp
 float temp = ler_sensor_temperatura();
@@ -188,478 +157,287 @@ float temp = ler_sensor_temperatura();
 ```
 
 #### `int ler_nivel_agua()`
-Lê os 3 sensores capacitivos e conta quantos detectaram água.
+Le os 3 sensores capacitivos e retorna quantos detectaram agua.
 
 **Retorno:**
 - `3` = Bebedouro cheio (100%)
-- `2` = Nível médio (66%)
-- `1` = Nível baixo (33%)
+- `2` = Nivel medio (66%)
+- `1` = Nivel baixo (33%)
 - `0` = Vazio
 
 ```cpp
 int nivel = ler_nivel_agua();
-if(nivel <= 1) {
-    // Alerta de água baixa
-}
 ```
 
 #### `float calcular_temperatura_filtrada(float nova_leitura)`
-Aplica filtro de média móvel nas últimas 5 leituras.
-
-**Por que usar média móvel?**
-- Remove ruídos e oscilações momentâneas
-- Torna a leitura mais estável
-- Evita alertas por variações rápidas
+Aplica filtro de media movel nas ultimas 5 leituras para remover ruido.
 
 ```cpp
 float temp_bruta = ler_sensor_temperatura();
 float temp_suave = calcular_temperatura_filtrada(temp_bruta);
 ```
 
----
-
-### 📊 Funções de Formatação
+### Funcoes de Formatacao
 
 #### `String obter_status_nivel(int contagem)`
 Converte a contagem de sensores em texto descritivo.
 
 ```cpp
-// Entrada: 3 → Saída: "Alto (100%)"
-// Entrada: 2 → Saída: "Medio (66%)"
-// Entrada: 1 → Saída: "Baixo (33%)"
-// Entrada: 0 → Saída: "Vazio (0%)"
+// Entrada: 3 -> Saida: "Alto (100%)"
+// Entrada: 2 -> Saida: "Medio (66%)"
+// Entrada: 1 -> Saida: "Baixo (33%)"
+// Entrada: 0 -> Saida: "Vazio (0%)"
 ```
 
-#### `int obter_percentual_nivel(int contagem)`
-Converte contagem em percentual numérico.
-
-```cpp
-int percentual = obter_percentual_nivel(2); // Retorna 66
-```
-
----
-
-### 🔔 Funções de Alertas
-
-#### `void adicionar_alerta(String tipo, String detalhe)`
-Registra um alerta no histórico com timestamp.
-
-**Parâmetros:**
-- `tipo`: Categoria do alerta ("Agua Baixa", "Temperatura Alta")
-- `detalhe`: Informação específica ("33%", "25.5 C")
-
-**Funcionamento:**
-- Armazena os últimos 10 alertas
-- Quando chega no 11º, sobrescreve o mais antigo (buffer circular)
-
-```cpp
-adicionar_alerta("Agua Baixa", "33%");
-// Registra: "Agua Baixa: 33%" com timestamp
-```
-
----
-
-### 🏷️ Funções RFID
-
-#### `bool comparar_uid(byte *buffer1, const byte *buffer2, int size)`
-Compara dois UIDs byte por byte.
-
-```cpp
-// Retorna true se forem idênticos
-bool igual = comparar_uid(uid_lido, UID_GATO, 4);
-```
+### Funcoes RFID (Opcional)
 
 #### `bool verificar_tag_rfid()`
-Verifica se há uma tag presente e se é a do gato.
+Verifica se ha uma tag RFID presente e se e a tag cadastrada.
 
-**Fluxo:**
-1. Verifica se há algum cartão próximo
-2. Tenta ler os dados do cartão
-3. Compara com o UID cadastrado
-4. Retorna `true` se for o gato
+**Retorna:** `true` se detectou a tag do gato
 
-```cpp
-if(verificar_tag_rfid()) {
-    // O gato está perto do bebedouro!
-}
-```
+**Nota:** Requer configuracao do `UID_GATO[]` para funcionar.
 
----
-
-### 🚀 Funções de Inicialização
+### Funcoes de Inicializacao
 
 #### `void init_sesores_cap()`
-Configura os pinos dos sensores capacitivos.
-
-**O que faz:**
-- Define LED como saída
-- Define sensores capacitivos como entrada com pull-up interno
-- Acende o LED durante inicialização
+Configura os pinos dos sensores capacitivos como entrada com pull-up interno.
 
 #### `void init_rfid()`
-Inicializa o módulo RFID MFRC522.
-
-**Passo a passo:**
-1. Inicia barramento SPI
-2. Inicializa o leitor RFID
-3. Confirma no Serial Monitor
+Inicializa o modulo RFID MFRC522 via barramento SPI.
 
 #### `void init_ds18b20()`
-Configura o sensor de temperatura DS18B20.
-
-**Configurações:**
-- Resolução: 12 bits (precisão de 0.0625°C)
-- Modo: Sem espera (leitura assíncrona)
-- Mostra endereço do sensor encontrado
+Configura o sensor de temperatura DS18B20 com resolucao de 12 bits.
 
 #### `void init_wifi()`
-Conecta à rede WiFi e sincroniza horário.
-
-**Processo:**
-1. Conecta ao WiFi configurado
-2. Aguarda conexão (mostra pontos no Serial)
-3. Configura certificado SSL para Telegram
-4. Sincroniza com servidor NTP (hora de Brasília)
-5. Exibe IP e hora atual
+Conecta a rede WiFi configurada e prepara conexao segura com Telegram.
 
 ---
 
-## 💬 Comandos do Telegram
+## Comandos do Telegram
 
 ### `/status` - Status Completo
 
-Exibe todas as informações do bebedouro de uma vez.
+Exibe todas as informacoes do bebedouro.
 
-**Exemplo de resposta:**
+**Resposta:**
 ```
 Status do Bebedouro
 
-Nivel da agua: 66%
+Nivel da agua: Medio (66%)
 Temperatura: 23.5 C
-Visitas hoje: 4
-
-Atualizado: 14:32
+Visitas hoje: 2
 ```
 
-**Quando usar:**
-- Para verificação rápida completa
-- Ao acordar/chegar em casa
-- Antes de sair
+### `/nivel` - Nivel de Agua
 
----
+Mostra apenas o nivel atual da agua.
 
-### `/nivel` - Nível de Água
-
-Mostra informações detalhadas sobre o nível.
-
-**Exemplo de resposta:**
+**Resposta:**
 ```
-Nivel da Agua
-
-Atual: 66% (Medio (66%))
-
-[======----]
-
-Nivel adequado.
+Nivel atual da agua: Medio (66%)
 ```
 
-**Elementos:**
-- Percentual numérico
-- Status descritivo
-- Barra visual de 10 caracteres
-- Avaliação do nível
+### `/temperatura` - Temperatura
 
-**Quando usar:**
-- Antes de sair de casa por muito tempo
-- Para saber se precisa adicionar água
+Mostra a temperatura atual da agua.
 
----
-
-### `/temperatura` - Temperatura da Água
-
-Verifica se a água está em temperatura adequada.
-
-**Exemplo de resposta:**
+**Resposta:**
 ```
-Temperatura da Agua
-
-Atual: 23.5 C
-Limite max: 24.0 C
-
-Temperatura ideal.
+Temperatura atual: 23.5 C
 ```
 
-**Status possíveis:**
-- "Temperatura acima do limite!" (> 24°C)
-- "Temperatura proxima do limite." (22-24°C)
-- "Temperatura ideal." (< 22°C)
+### `/visitas` - Historico de Visitas
 
-**Quando usar:**
-- Em dias muito quentes
-- Se o bebedouro está exposto ao sol
+Mostra o contador de visitas do dia.
 
----
-
-### `/visitas` - Histórico de Visitas
-
-Mostra quantas vezes o gato bebeu água.
-
-**Exemplo de resposta:**
+**Resposta:**
 ```
-Historico de Visitas
-
-Hoje: 4 visitas
-Ontem: 6 visitas
-
-Hidratacao normal!
+Visitas hoje: 2
 ```
 
-**Análises automáticas:**
-- 0 visitas: "Seu gato ainda nao bebeu agua hoje."
-- 1-2 visitas: "Poucas visitas hoje."
-- 3-5 visitas: "Hidratacao normal!"
-- 6+ visitas: "Muito ativo hoje!"
+**Nota:** Requer tag RFID configurada para contagem automatica. Sem RFID, o contador permanece em 0.
 
-**Quando usar:**
-- Para monitorar hábitos do pet
-- Detectar mudanças de comportamento
-- Verificar hidratação adequada
+### `/alertas` - Limites de Seguranca
 
----
+Mostra a configuracao atual dos limites de alerta.
 
-### `/alertas` - Histórico de Alertas
-
-Mostra os últimos alertas enviados pelo sistema.
-
-**Exemplo de resposta (com alertas):**
+**Resposta:**
 ```
-Historico de Alertas
-
-Ultimos alertas:
-
-- Agua Baixa: 33%
-  09/12/2025 12:30:15
-
-- Temperatura Alta: 25.2 C
-  09/12/2025 10:15:42
-
-Total de alertas: 8
+Configuracao de alertas:
+Temperatura maxima: 24.0 C
+Alerta quando nivel <= 33%
 ```
-
-**Exemplo (sem alertas):**
-```
-Historico de Alertas
-
-Nenhum alerta registrado!
-
-Seu bebedouro esta funcionando perfeitamente.
-```
-
-**Informações exibidas:**
-- Últimos 5 alertas
-- Data e hora de cada ocorrência
-- Total de alertas desde a inicialização
-
-**Quando usar:**
-- Para revisar problemas passados
-- Identificar padrões (sempre alerta no mesmo horário?)
-- Verificar se sistema está funcionando
-
----
 
 ### `/help` ou `/start` - Lista de Comandos
 
-Mostra todos os comandos disponíveis.
+Mostra todos os comandos disponiveis.
 
-**Exemplo de resposta:**
+**Resposta:**
 ```
-Ola, João! Eu sou o Monitor de Bebedouro.
+Ola, [Nome]! Eu sou o Monitor de Bebedouro.
 
 Comandos disponiveis:
-
 /status - Visao geral completa
 /nivel - Nivel da agua
 /temperatura - Temperatura
 /visitas - Historico de idas
-/alertas - Historico de alertas
+/alertas - Limites de seguranca
 ```
-
-**Quando usar:**
-- Primeira interação com o bot
-- Esqueceu algum comando
 
 ---
 
-## 🤖 Notificações Automáticas
+## Notificacoes Automaticas
 
-### Relatório Periódico
+### Relatorio Periodico
 
-**Quando acontece:** A cada 1 hora (3600000 ms)
+**Frequencia:** A cada 1 hora (configuravel via `INTERVALO_RELATORIO_MS`)
 
 **Exemplo:**
 ```
 Relatorio Periodico:
-Nivel da agua: 66%
+Nivel da agua: Medio (66%)
 Temperatura: 23.5 C
-Visitas hoje: 4
-Horario: 14:00
+Visitas hoje: 2
 ```
 
-**Configuração:** Altere `INTERVALO_RELATORIO_MS` para ajustar
+### Alerta de Nivel Baixo
 
----
-
-### Alerta de Nível Baixo
-
-**Quando acontece:** Quando 1 ou menos sensores detectam água (≤ 33%)
+**Quando:** Nivel <= 33% (1 sensor ou menos detectando agua)
 
 **Exemplo:**
 ```
 ALERTA!
-
-Nivel da agua baixo: 33%. Adicione mais agua
-14:32
+Nivel da agua baixo: Baixo (33%). Adicione mais agua
 ```
 
 **Cooldown:** 15 minutos entre alertas do mesmo tipo
 
----
-
 ### Alerta de Temperatura Alta
 
-**Quando acontece:** Temperatura ultrapassa 24°C
+**Quando:** Temperatura > 24°C (configuravel via `VALOR_MAX_TEMPERATURA`)
 
 **Exemplo:**
 ```
 ALERTA!
-
 Temperatura da agua elevada: 25.2 C.
-14:32
 ```
-
-**Dica:** Ajuste o limite em `VALOR_MAX_TEMPERATURA`
 
 ---
 
-## 🔄 Máquina de Estados
+## Maquina de Estados
 
-O sistema funciona como uma máquina de estados finitos. Cada estado executa uma função específica.
+O sistema funciona como uma maquina de estados finitos (FSM).
 
 ### Diagrama de Estados
 
 ```
-INICIAL → OCIOSO ⟷ GATO_DETECTADO → MEDICAO → ENVIO_DADOS
-                                          ↓
-                                      ALERTA → OCIOSO
+INICIAL -> OCIOSO <-> GATO_DETECTADO -> MEDICAO -> ENVIO_DADOS -> OCIOSO
+                                            |
+                                            v
+                                        ALERTA -> OCIOSO
 ```
 
-### Estados Detalhados
+### Descricao dos Estados
 
-#### 1️⃣ ESTADO_INICIAL
-**Executado:** Uma única vez ao ligar
+#### ESTADO_INICIAL
+**Executado:** Uma unica vez ao ligar
 
-**O que faz:**
-- Inicializa todos os sensores
+**Acoes:**
+- Inicializa sensores capacitivos
+- Inicializa RFID
+- Inicializa sensor de temperatura
 - Conecta ao WiFi
-- Sincroniza horário
-- Envia mensagem de boas-vindas ao Telegram
-- Transita para OCIOSO
+- Envia mensagem "Sistema Conectado" ao Telegram
 
-**LED:** Ligado durante inicialização
+**LED:** Ligado durante inicializacao
+
+**Proximo estado:** OCIOSO
 
 ---
 
-#### 2️⃣ ESTADO_OCIOSO
-**Executado:** Maior parte do tempo
+#### ESTADO_OCIOSO
+**Executado:** Maior parte do tempo (aguardando eventos)
 
-**O que faz:**
-- Verifica reset diário (meia-noite)
-- Aguarda detecção de tag RFID
-- Conta tempo para próximo relatório
+**Acoes:**
+- Verifica se ha tag RFID proxima
+- Conta tempo para proximo relatorio periodico
 
-**Transições:**
-- Se detectar tag → GATO_DETECTADO
-- Se passou 1 hora → MEDICAO
+**Transicoes:**
+- Se detectar tag RFID -> GATO_DETECTADO
+- Se passou 1 hora -> MEDICAO
 
 **LED:** Desligado
 
 ---
 
-#### 3️⃣ ESTADO_GATO_DETECTADO
-**Executado:** Quando tag RFID é detectada
+#### ESTADO_GATO_DETECTADO
+**Executado:** Quando tag RFID e detectada
 
-**O que faz:**
-- Aguarda 5 segundos para confirmar presença
-- Se confirmado: incrementa contador de visitas
-- Transita para MEDICAO
+**Acoes:**
+- Aguarda 5 segundos (TEMPO_MINIMO_PERMANENCIA_MS)
+- Se tag continuar presente, confirma visita
+- Incrementa contador `visitas_hoje`
 
-**Por que 5 segundos?**
-- Evita contagens falsas
-- Garante que o gato realmente está bebendo
+**LED:** Piscando (1 segundo on/off)
 
-**LED:** Piscando (1 segundo ligado, 1 segundo desligado)
+**Proximo estado:** MEDICAO
 
 ---
 
-#### 4️⃣ ESTADO_MEDICAO
-**Executado:** Após visita confirmada ou periodicamente
+#### ESTADO_MEDICAO
+**Executado:** Apos visita confirmada ou periodicamente
 
-**O que faz:**
-1. Lê nível de água
-2. Lê temperatura
-3. Aplica filtro de média móvel
-4. Verifica condições de alerta
+**Acoes:**
+1. Le nivel de agua
+2. Le temperatura
+3. Aplica filtro de media movel
+4. Verifica condicoes de alerta
 
-**Transições:**
-- Se alerta necessário → ALERTA
-- Se passou 1 hora → ENVIO_DADOS
-- Caso contrário → OCIOSO
+**Transicoes:**
+- Se nivel <= 33% OU temperatura > 24°C -> ALERTA
+- Se passou 1 hora desde ultimo relatorio -> ENVIO_DADOS
+- Caso contrario -> OCIOSO
 
-**LED:** Ligado durante medição
+**LED:** Ligado durante medicao
 
 ---
 
-#### 5️⃣ ESTADO_ENVIO_DADOS
+#### ESTADO_ENVIO_DADOS
 **Executado:** A cada 1 hora
 
-**O que faz:**
-- Compila relatório completo
-- Envia mensagem ao Telegram
-- Reseta timer de relatório
-- Transita para OCIOSO
-
-**Formato do relatório:**
-```
-Relatorio Periodico:
-Nivel da agua: 66%
-Temperatura: 23.5 C
-Visitas hoje: 4
-Horario: 14:00
-```
+**Acoes:**
+- Compila relatorio completo
+- Envia via Telegram
+- Reseta timer de relatorio
 
 **LED:** Desligado
 
+**Proximo estado:** OCIOSO
+
 ---
 
-#### 6️⃣ ESTADO_ALERTA
+#### ESTADO_ALERTA
 **Executado:** Quando detecta problema
 
-**O que faz:**
-1. Verifica cooldown (15 min desde último alerta)
-2. Monta mensagem específica do problema
-3. Registra no histórico de alertas
-4. Envia ao Telegram
-5. Retorna para OCIOSO
+**Acoes:**
+- Verifica cooldown (15 min desde ultimo alerta)
+- Se passou cooldown:
+  - Monta mensagem de alerta
+  - Envia via Telegram
+  - Atualiza timestamp do ultimo alerta
 
-**Condições de alerta:**
-- Nível ≤ 33% (1 sensor ou menos)
+**Condicoes de alerta:**
+- Nivel de agua <= 33%
 - Temperatura > 24°C
 
-**LED:** Piscando rápido (0.5s ligado, 0.5s desligado)
+**LED:** Piscando rapido (0.5 segundo on/off)
+
+**Proximo estado:** OCIOSO
 
 ---
 
-## 🔍 Fluxo de Execução
+## Fluxo de Execucao
 
 ### Loop Principal
 
@@ -667,37 +445,38 @@ Horario: 14:00
 void loop() {
     // 1. Verifica mensagens do Telegram (a cada 1 segundo)
     if (WiFi conectado && passou 1 segundo) {
-        processar_mensagens_telegram();
+        processar_mensagens();
     }
     
-    // 2. Executa estado atual da máquina
-    fsm(); // Finite State Machine
+    // 2. Executa maquina de estados
+    fsm();
 }
 ```
 
 ### Processamento de Comandos
 
-1. Bot recebe mensagem
-2. Verifica se é do chat autorizado (ID_CHAT)
-3. Identifica comando
-4. Executa ação correspondente
-5. Envia resposta formatada
+1. Bot verifica novas mensagens
+2. Filtra apenas mensagens do chat autorizado (ID_CHAT)
+3. Identifica o comando
+4. Le sensores se necessario
+5. Formata resposta
+6. Envia via Telegram
 
 ---
 
-## 📝 Customizações Comuns
+## Customizacoes
 
-### Alterar Intervalo de Relatórios
+### Alterar Intervalo de Relatorios
 
 ```cpp
-// Para 30 minutos (1800000 ms)
+// Para 30 minutos
 const unsigned long INTERVALO_RELATORIO_MS = 1800000;
 
-// Para 2 horas (7200000 ms)
+// Para 2 horas
 const unsigned long INTERVALO_RELATORIO_MS = 7200000;
 ```
 
-### Alterar Temperatura Máxima
+### Alterar Temperatura Maxima
 
 ```cpp
 // Para 26°C
@@ -707,141 +486,134 @@ const float VALOR_MAX_TEMPERATURA = 26.0;
 ### Alterar Cooldown de Alertas
 
 ```cpp
-// Para 30 minutos (1800000 ms)
+// Para 30 minutos
 const unsigned long COOLDOWN_ALERTA_MS = 1800000;
 
-// Para 5 minutos (300000 ms) - mais alertas
+// Para 5 minutos
 const unsigned long COOLDOWN_ALERTA_MS = 300000;
 ```
 
-### Alterar Tempo de Confirmação de Visita
+### Alterar Tempo de Confirmacao de Visita
 
 ```cpp
-// Para 3 segundos (3000 ms)
+// Para 3 segundos
 const unsigned long TEMPO_MINIMO_PERMANENCIA_MS = 3000;
 
-// Para 10 segundos (10000 ms) - mais rigoroso
+// Para 10 segundos
 const unsigned long TEMPO_MINIMO_PERMANENCIA_MS = 10000;
 ```
 
 ---
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
-### Bot não responde
+### Bot nao responde
 
 **Verificar:**
-1. Token do bot está correto?
-2. ID do chat está correto?
-3. WiFi está conectado? (veja Serial Monitor)
-4. Certificado SSL está configurado?
+1. Token do bot esta correto?
+2. ID do chat esta correto?
+3. WiFi conectado? (Serial Monitor mostra "WiFi connected")
+4. Certificado SSL configurado?
 
-**Solução temporária:**
+**Solucao temporaria:**
 ```cpp
-// Na função init_wifi(), adicione antes de setCACert:
-secured_client.setInsecure(); // APENAS PARA TESTES!
+// Em init_wifi(), adicione antes de setCACert:
+secured_client.setInsecure(); // APENAS PARA TESTES
 ```
 
 ### Sensor de temperatura retorna -127°C
 
-**Causa:** Sensor não encontrado ou mal conectado
+**Causa:** Sensor nao encontrado ou mal conectado
 
 **Verificar:**
-- Conexão do pino de dados (GPIO 4)
+- Conexao do pino de dados (GPIO 4)
 - Resistor pull-up de 4.7kΩ entre dados e VCC
-- Alimentação 3.3V ou 5V
+- Alimentacao 3.3V ou 5V
+- Sensor esta funcionando
 
-### RFID não detecta tag
+### RFID nao detecta tag
 
 **Verificar:**
-- Conexões SPI (MOSI, MISO, SCK, SS, RST)
-- Alimentação do módulo (3.3V)
-- UID da tag está correto no código
+- Conexoes SPI corretas (MOSI, MISO, SCK)
+- Pinos SS (GPIO 15) e RST (GPIO 5)
+- Alimentacao do modulo (3.3V)
+- UID configurado no codigo
 
-**Descobrir UID:**
-```cpp
-// Adicione no loop temporariamente:
-if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-    Serial.print("UID: ");
-    for (byte i = 0; i < 4; i++) {
-        Serial.print(mfrc522.uid.uidByte[i], HEX);
-        Serial.print(" ");
-    }
-    Serial.println();
-}
-```
+**Para descobrir UID da tag:**
+Aproxime a tag e veja o Serial Monitor durante inicializacao.
 
 ### Sensores capacitivos sempre retornam 0
 
 **Verificar:**
 - Pinos configurados como INPUT_PULLUP
-- Sensores estão com jumper em modo digital (não analógico)
-- Distância entre sensor e água (máx ~5mm através do plástico)
+- Sensores em modo digital (nao analogico)
+- Distancia entre sensor e agua (max ~5mm atraves do plastico)
+- Sensores estao funcionando (teste individual)
+
+### Erro de compilacao no init_wifi()
+
+**Causa:** Variaveis de configuracao de tempo nao definidas
+
+O codigo original tem uma chamada a `configTime()` mas nao define as variaveis necessarias. Remova ou comente a linha:
+
+```cpp
+// configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+```
 
 ---
 
-## 📊 Monitoramento via Serial
+## Monitoramento via Serial
 
-Durante execução, o Serial Monitor (115200 baud) mostra:
+Abra o Serial Monitor (115200 baud) para ver:
 
 ```
-=== Iniciando Sistema ===
+Estado: INICIALIZANDO
 Modulo RFID MFRC522 inicializado.
 1 sensores.
 Endereco sensor: 28FF...
 Connecting to Wifi SSID boanoite
 .....
 WiFi connected. IP address: 192.168.1.100
-Hora atual: 09/12/2025 14:32:15
 
-Estado: INICIALIZANDO
 Visita confirmada.
 Alerta em Cooldown.
-Reset diario realizado.
 ```
 
 ---
 
-## 🎓 Conceitos Aprendidos
+## Conceitos Implementados
 
-### 1. Máquina de Estados Finitos (FSM)
-Organização de código complexo em estados bem definidos, facilitando manutenção.
+### 1. Maquina de Estados Finitos (FSM)
+Organizacao clara do comportamento do sistema em estados bem definidos.
 
-### 2. Filtro de Média Móvel
-Técnica para suavizar leituras de sensores e remover ruídos.
+### 2. Filtro de Media Movel
+Suaviza leituras do sensor de temperatura removendo ruido e oscilacoes.
 
-### 3. Buffer Circular
-Estrutura de dados eficiente para armazenar histórico limitado (alertas).
+### 3. Debouncing Temporal
+Aguarda tempo minimo (5s) antes de confirmar presenca do gato via RFID.
 
-### 4. Debouncing Temporal
-Aguardar tempo mínimo antes de confirmar evento (visita do gato).
+### 4. Cooldown de Alertas
+Evita spam de notificacoes aguardando 15 minutos entre alertas do mesmo tipo.
 
-### 5. API RESTful
-Comunicação com serviços web (Telegram) via HTTP/HTTPS.
-
----
-
-## 👥 Autores
-
-**Ana Caroline Pedrosa & Paulo Alfeu**
+### 5. API REST via Telegram
+Comunicacao com bot do Telegram usando requests HTTPS.
 
 ---
 
-## 📄 Licença
+## Proximas Melhorias
 
-Projeto educacional de código aberto.
-
----
-
-## 🚀 Próximas Melhorias
-
-- [ ] Adicionar sensor ultrassônico para medir volume exato
-- [ ] Implementar gráfico de consumo no Telegram
-- [ ] Suporte para múltiplos gatos (várias tags)
-- [ ] Modo noturno (desabilitar alertas)
-- [ ] Integração com Google Sheets para análise de dados
-- [ ] Bomba automática para reabastecer água
+- Adicionar sensor ultrassonico para medicao precisa de volume
+- Implementar graficos de consumo no Telegram
+- Suporte para multiplos gatos (varias tags RFID)
+- Modo noturno (desabilitar alertas em horarios especificos)
+- Integracao com Google Sheets para analise historica
+- Bomba automatica para reabastecer agua
+- Display LCD para visualizacao local
 
 ---
 
-**Dúvidas?** Entre em contato ou abra uma issue no repositório!
+## Licenca
+
+Projeto educacional de codigo aberto.
+
+**Duvidas?** Entre em contato com os autores.
