@@ -1,6 +1,6 @@
 /*
   Ana Caroline Pedrosa & Paulo Alfeu
-  Monitoramento de Agua para Gato - Versao em Portugues
+  Monitoramento de Agua para Gato
 */
 
 // Bibliotecas
