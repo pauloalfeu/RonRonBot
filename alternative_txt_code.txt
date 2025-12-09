@@ -1,6 +1,10 @@
 /*
   Ana Caroline Pedrosa & Paulo Alfeu
+<<<<<<< HEAD
   Monitoramento de Água para Gato - Versão em Português
+=======
+  Monitoramento de Agua para Gato - RonRon
+>>>>>>> 64b897e7af2987247e3d9d42b16f2908ae7aab65
 */
 
 // Bibliotecas
@@ -418,4 +422,76 @@ void loop(){
   }
   
   fsm();
+<<<<<<< HEAD
 }
+=======
+}
+
+
+void tratar_novas_mensagens(int numNovasMensagens)
+{
+    for (int i = 0; i < numNovasMensagens; i++)
+    {
+        long id_chat = bot.messages[i].chat_id;
+        String texto = bot.messages[i].text;
+        String nome_usuario = bot.messages[i].from_name;
+
+        if (id_chat != ID_CHAT) continue; 
+
+        String resposta = "";
+        int contagem_nivel = ler_nivel_agua();
+        String status_nivel = obter_status_nivel(contagem_nivel);
+
+        if (texto == "/status") {
+            ler_sensor_temperatura(); 
+            
+            resposta = "*Status do Bebedouro*\n\n";
+            resposta += "Nivel da agua: " + status_nivel + "\n";
+            resposta += "Temperatura: " + String(temperatura_filtrada, 1) + " C\n";
+            resposta += "Visitas hoje: " + String(visitas_hoje);
+            
+            bot.sendMessage(id_chat, resposta, "Markdown");
+            
+        } 
+        else if (texto == "/nivel") {
+            resposta = "Nivel atual da agua: " + status_nivel;
+            bot.sendMessage(id_chat, resposta, "");
+
+        } 
+        
+        else if (texto == "/temperatura") {
+            ler_sensor_temperatura(); 
+            
+            resposta = "Temperatura atual: " + String(temperatura_filtrada, 1) + " C";
+            
+            bot.sendMessage(id_chat, resposta, "");
+
+        } 
+      
+        else if (texto == "/visitas") {
+            resposta = "Visitas hoje: " + String(visitas_hoje);
+            
+            bot.sendMessage(id_chat, resposta, "");
+        } 
+       
+        else if (texto == "/alertas") {
+            resposta = "Configuracao de alertas:\n";
+            resposta += "Temperatura maxima: " + String(VALOR_MAX_TEMPERATURA, 1) + " C\n";
+            resposta += "Alerta quando nivel <= 33%";
+            
+            bot.sendMessage(id_chat, resposta, "");
+        }
+        // Comando /start ou desconhecido
+        else if (texto == "/start" || texto == "/help") {
+            resposta = "Ola, " + nome_usuario + "! Eu sou o Monitor de Bebedouro.\n\n";
+            resposta += "Comandos disponiveis:\n";
+            resposta += "/status - Visao geral completa\n";
+            resposta += "/nivel - Nivel da agua\n";
+            resposta += "/temperatura - Temperatura\n";
+            resposta += "/visitas - Historico de idas\n";
+            resposta += "/alertas - Limites de seguranca";
+            bot.sendMessage(id_chat, resposta, "");
+        }
+    }
+}
+>>>>>>> 64b897e7af2987247e3d9d42b16f2908ae7aab65
